@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hieroglyphs" />
+  <title>Hieroglyph Translator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1207;
+      color: #f0ddb0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100dvh;
+      padding: 24px 16px 48px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #c8a96e;
+      font-size: 1.5rem;
+      letter-spacing: 0.08em;
+      margin-bottom: 28px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: #1a1207;
+    }
+
+    .btn-primary { background: #c8a96e; }
+    .btn-secondary { background: #5a3e1b; color: #f0ddb0; }
+
+    /* hidden file inputs triggered by buttons */
+    #inputCamera, #inputGallery { display: none; }
+
+    #status {
+      text-align: center;
+      color: #c8a96e;
+      min-height: 24px;
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    #annotated {
+      width: 100%;
+      border-radius: 10px;
+      display: none;
+      margin-bottom: 20px;
+      background: #2a1f0e;
+    }
+
+    #results { display: none; }
+
+    .result-count {
+      color: #c8a96e;
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+
+    .section-label {
+      color: #9a7a4a;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin: 16px 0 6px;
+    }
+
+    .translit {
+      color: #f0ddb0;
+      font-size: 1.3rem;
+      font-weight: 300;
+      letter-spacing: 0.15em;
+      margin-bottom: 4px;
+    }
+
+    .card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #2a1f0e;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 6px;
+    }
+
+    .card-num {
+      color: #9a7a4a;
+      font-size: 0.8rem;
+      font-weight: 700;
+      min-width: 20px;
+    }
+
+    .card-body { flex: 1; }
+
+    .card-name {
+      color: #f0ddb0;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .card-detail {
+      color: #9a7a4a;
+      font-size: 0.75rem;
+      margin-top: 2px;
+    }
+
+    .card-meaning {
+      color: #c8a96e;
+      font-size: 0.82rem;
+      margin-top: 2px;
+    }
+
+    .card-conf {
+      color: #5a7a4a;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 2px solid #5a3e1b;
+      border-top-color: #c8a96e;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <h1>Hieroglyph Translator</h1>
+
+  <div class="buttons">
+    <button class="btn btn-primary" onclick="document.getElementById('inputCamera').click()">
+      Take Photo
+    </button>
+    <button class="btn btn-secondary" onclick="document.getElementById('inputGallery').click()">
+      Pick from Gallery
+    </button>
+  </div>
+
+  <!-- camera: capture from rear camera -->
+  <input id="inputCamera"  type="file" accept="image/*" capture="environment"
+         onchange="handleFile(this)" />
+  <!-- gallery: no capture attribute = opens photo library -->
+  <input id="inputGallery" type="file" accept="image/*"
+         onchange="handleFile(this)" />
+
+  <div id="status"></div>
+
+  <img id="annotated" alt="Annotated result" />
+
+  <div id="results">
+    <div class="result-count" id="countLine"></div>
+    <div id="translitBlock" style="display:none">
+      <div class="section-label">Transliteration</div>
+      <div class="translit" id="translitText"></div>
+    </div>
+    <div class="section-label">Reading order</div>
+    <div id="cards"></div>
+  </div>
+
+  <script>
+    async function handleFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      input.value = '';   // allow re-selecting the same file
+
+      setStatus('<span class="spinner"></span>Analysing hieroglyphs…');
+      document.getElementById('annotated').style.display = 'none';
+      document.getElementById('results').style.display   = 'none';
+
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        const res  = await fetch('/detect', { method: 'POST', body: form });
+        const data = await res.json();
+        showResults(data);
+        setStatus('');
+      } catch (e) {
+        setStatus('Error: could not reach the server. Is it running?');
+      }
+    }
+
+    function showResults(data) {
+      // annotated image
+      const img = document.getElementById('annotated');
+      img.src = 'data:image/jpeg;base64,' + data.annotated_image;
+      img.style.display = 'block';
+
+      // count
+      document.getElementById('countLine').textContent =
+        data.count + ' hieroglyph' + (data.count !== 1 ? 's' : '') + ' detected';
+
+      // transliteration
+      const tBlock = document.getElementById('translitBlock');
+      if (data.transliteration) {
+        document.getElementById('translitText').textContent = data.transliteration;
+        tBlock.style.display = 'block';
+      } else {
+        tBlock.style.display = 'none';
+      }
+
+      // detection cards
+      const cards = document.getElementById('cards');
+      cards.innerHTML = '';
+      data.detections.forEach((d, i) => {
+        const detail = [
+          d.phonetic !== '—' ? 'Phonetic: ' + d.phonetic : '',
+          d.gardiner !== '—' ? 'Gardiner: ' + d.gardiner : '',
+        ].filter(Boolean).join('   ');
+
+        cards.innerHTML += `
+          <div class="card">
+            <div class="card-num">${i + 1}</div>
+            <div class="card-body">
+              <div class="card-name">${d.class_name.replace(/_/g, ' ')}</div>
+              ${detail ? `<div class="card-detail">${detail}</div>` : ''}
+              <div class="card-meaning">${d.meaning}</div>
+            </div>
+            <div class="card-conf">${Math.round(d.confidence * 100)}%</div>
+          </div>`;
+      });
+
+      document.getElementById('results').style.display = 'block';
+    }
+
+    function setStatus(html) {
+      document.getElementById('status').innerHTML = html;
+    }
+  </script>
+
+</body>
+</html>

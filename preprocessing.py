@@ -13,11 +13,11 @@ import shutil
 # ***********************************************************
 
  # Get base directory
-   BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
    
    # Configure paths - users should update these to their dataset location
-   DATASET_PATH = os.path.join(BASE_DIR, "dataset")  # or provide your dataset path
-   PREPROCESSED_PATH = os.path.join(BASE_DIR, "preprocessed_data")
+DATASET_PATH = os.path.join(BASE_DIR, "dataset")  # or provide your dataset path
+PREPROCESSED_PATH = os.path.join(BASE_DIR, "preprocessed_data")
 
 #  preprocessed directories
 os.makedirs(PREPROCESSED_PATH, exist_ok=True)

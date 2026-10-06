@@ -67,3 +67,19 @@ Thumbs.db
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Local data, training output and model weights (too big for git)
+hieroglyph_dataset/
+runs/
+aug_preview/
+preproc_results/
+preprocessed_data/
+*.pt
+*.onnx
+test_*.jpg
+pipeline_output.jpg
+
+# Node
+node_modules/
+dist/
+.expo/
